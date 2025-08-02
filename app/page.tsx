@@ -1,103 +1,262 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState } from 'react'
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { CodeEditor } from "@/components/codeEditor"
+import { LanguageSelector } from "@/components/languageSelector"
+import { toast } from "sonner"
+import { Wand2, Sparkles, Code, Zap, RotateCcw } from "lucide-react"
+
+interface CorrectionResult {
+  correctedCode: string
+  explanation: string
+  issues: string[]
+}
+
+export default function HomePage() {
+  const [originalCode, setOriginalCode] = useState('')
+  const [language, setLanguage] = useState('typescript')
+  const [description, setDescription] = useState('')
+  const [result, setResult] = useState<CorrectionResult | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const correctCode = async () => {
+    // Validation
+    if (!originalCode.trim()) {
+      toast.error('Please enter some code to correct')
+      return
+    }
+
+    setLoading(true)
+    
+    // Show loading toast
+    const loadingToast = toast.loading('Groq is analyzing your code...', {
+      description: 'This may take a few seconds'
+    })
+
+    try {
+      const response = await fetch('/api/correct', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: originalCode,
+          language,
+          description: description.trim() || undefined
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}: Failed to correct code`)
+      }
+
+      // Validate response data
+      if (!data.correctedCode) {
+        throw new Error('Invalid response: Missing corrected code')
+      }
+
+      setResult(data)
+      
+      // Success toast
+      toast.success('Code corrected successfully!', {
+        description: `Found and fixed ${data.issues?.length || 0} issues`,
+        duration: 3000
+      })
+
+    } catch (error) {
+      console.error('Code correction error:', error)
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      
+      toast.error('Failed to correct code', {
+        description: errorMessage,
+        duration: 5000
+      })
+    } finally {
+      setLoading(false)
+      toast.dismiss(loadingToast)
+    }
+  }
+
+  const resetAll = () => {
+    setOriginalCode('')
+    setResult(null)
+    setDescription('')
+    toast.success('Reset complete', {
+      description: 'Ready for new code analysis'
+    })
+  }
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Code copied to clipboard!')
+    } catch (error) {
+      toast.error('Failed to copy code')
+    }
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Wand2 className="h-8 w-8 text-blue-600" />
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Claude Code Corrector
+            </h1>
+          </div>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Paste your buggy code and let Groq AI fix it! Get detailed explanations, 
+            error corrections, and code improvements powered by advanced AI.
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+
+        {/* Controls */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Code className="h-5 w-5" />
+              Configuration
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">
+                  Programming Language
+                </label>
+                <LanguageSelector value={language} onChange={setLanguage} />
+              </div>
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">
+                  Context (Optional)
+                </label>
+                <Textarea
+                  placeholder="Describe what this code should do..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="h-10 resize-none"
+                />
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={correctCode} 
+                disabled={loading || !originalCode.trim()}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                size="lg"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                {loading ? 'Analyzing...' : 'Fix My Code'}
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                onClick={resetAll}
+                disabled={loading}
+                size="lg"
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Reset
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Code Input/Output */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <CodeEditor
+            title="Your Code (Input)"
+            code={originalCode}
+            onChange={setOriginalCode}
+            language={language}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          
+          <div className="relative">
+            <CodeEditor
+              title="Groq Corrected Code"
+              code={result?.correctedCode || ''}
+              language={language}
+              readOnly
+            />
+            {result?.correctedCode && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute top-4 right-4 z-10"
+                onClick={() => copyToClipboard(result.correctedCode)}
+              >
+                Copy Code
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Results Analysis */}
+        {result && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5" />
+                Groq's Analysis & Explanation
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Explanation */}
+              <div>
+                <h4 className="text-lg font-semibold mb-3 text-gray-800">
+                  What Groq Fixed:
+                </h4>
+                <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
+                  <p className="text-gray-700 leading-relaxed">
+                    {result.explanation}
+                  </p>
+                </div>
+              </div>
+              
+              {/* Issues Found */}
+              {result.issues && result.issues.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold mb-3 text-gray-800">
+                    Issues Found & Fixed ({result.issues.length}):
+                  </h4>
+                  <div className="space-y-2">
+                    {result.issues.map((issue, index) => (
+                      <div 
+                        key={index} 
+                        className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-200"
+                      >
+                        <div className="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mt-0.5">
+                          {index + 1}
+                        </div>
+                        <p className="text-gray-700 flex-1">{issue}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Footer */}
+        <div className="text-center mt-12 text-gray-500">
+          <p className="text-sm">
+            Built with Next.js, TypeScript, Groq AI, and Tailwind CSS
+          </p>
+          <p className="text-xs mt-1">
+            Perfect for debugging, learning, and improving your code quality
+          </p>
+        </div>
+      </div>
     </div>
-  );
+  )
 }
